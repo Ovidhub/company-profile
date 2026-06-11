@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { useAdminData, Order } from "../context/AdminDataContext";
+import { useAdminData } from "../context/AdminDataContext";
 import { formatPrice } from "../data/products";
 import { ChevronRight, CreditCard, Truck, Shield, Check, MapPin, User, Mail, Phone, Lock, Lock as LockIcon, Building2, Banknote, Info } from "lucide-react";
 
@@ -47,11 +47,12 @@ function expiryValid(expiry: string): boolean {
 export default function CheckoutPage() {
   const { items, subtotal, tax, clearCart } = useCart();
   const navigate = useNavigate();
-  const { publicPaymentMethods, addOrder } = useAdminData();
+  const { publicPaymentMethods, placeOrder } = useAdminData();
   const enabledMethods = publicPaymentMethods.filter((m) => m.enabled).sort((a, b) => a.order - b.order);
-  const [selectedPayment, setSelectedPayment] = useState<string>(() => enabledMethods.find((m) => m.isDefault)?.id || enabledMethods[0]?.id || "");
+  const [selectedPayment, setSelectedPayment] = useState<string>("");
   const [step, setStep] = useState<Step>(1);
   const [shippingMethod, setShippingMethod] = useState<ShippingMethodId>("std");
+  const [placing, setPlacing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     email: "", firstName: "", lastName: "", phone: "",
@@ -59,9 +60,10 @@ export default function CheckoutPage() {
     cardName: "", cardNumber: "", expiry: "", cvv: "",
     saveInfo: true,
   });
-  const [orderId] = useState(`DEE-${Date.now().toString().slice(-8)}`);
 
-  const selectedMethod = enabledMethods.find((m) => m.id === selectedPayment);
+  // Payment methods load asynchronously — default to the configured default once available.
+  const effectivePayment = selectedPayment || enabledMethods.find((m) => m.isDefault)?.id || enabledMethods[0]?.id || "";
+  const selectedMethod = enabledMethods.find((m) => m.id === effectivePayment);
 
   const shippingOption = SHIPPING_METHODS.find((m) => m.id === shippingMethod) || SHIPPING_METHODS[0];
   const shippingCost = "freeOver" in shippingOption && subtotal > shippingOption.freeOver ? 0 : shippingOption.price;
@@ -108,39 +110,35 @@ export default function CheckoutPage() {
     setStep(s);
   };
 
-  const handlePlaceOrder = () => {
-    if (!validateStep(3) || !selectedMethod) return;
+  const handlePlaceOrder = async () => {
+    if (!validateStep(3) || !selectedMethod || placing) return;
 
-    // Card details are intentionally NOT stored — only a masked label is kept.
-    const paymentLabel = selectedMethod.type === "card"
-      ? `Card ending ${form.cardNumber.replace(/\D/g, "").slice(-4)}`
-      : selectedMethod.name;
-
-    const order: Order = {
-      id: orderId,
-      customer: {
-        name: `${form.firstName.trim()} ${form.lastName.trim()}`,
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        address: form.address.trim(),
-        city: form.city.trim(),
-        state: form.state.trim(),
-        zip: form.zip.trim(),
-        country: form.country,
-      },
-      items: items.map((i) => ({ productId: i.id, name: i.name, price: i.price, quantity: i.quantity, image: i.image })),
-      subtotal,
-      shipping: shippingCost,
-      tax,
-      total,
-      status: "pending",
-      paymentMethod: paymentLabel,
-      date: new Date().toISOString().slice(0, 10),
-    };
-
-    addOrder(order);
-    clearCart();
-    navigate(`/order-confirmation?order=${orderId}`);
+    // Card details never leave the browser — the server only records the
+    // payment method name and computes all prices from its own database.
+    setPlacing(true);
+    try {
+      const order = await placeOrder({
+        customer: {
+          name: `${form.firstName.trim()} ${form.lastName.trim()}`,
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          address: form.address.trim(),
+          city: form.city.trim(),
+          state: form.state.trim(),
+          zip: form.zip.trim(),
+          country: form.country,
+        },
+        items: items.map((i) => ({ product_id: Number(i.id), quantity: i.quantity })),
+        shipping_method: shippingMethod,
+        payment_method_id: Number(selectedMethod.id),
+      });
+      clearCart();
+      navigate(`/order-confirmation?order=${order.id}`);
+    } catch (err) {
+      setErrors({ payment: err instanceof Error ? err.message : "Could not place the order. Please try again." });
+    } finally {
+      setPlacing(false);
+    }
   };
 
   const steps = [
@@ -357,10 +355,10 @@ export default function CheckoutPage() {
                               key={m.id}
                               onClick={() => { setSelectedPayment(m.id); setErrors((e) => { const { payment: _p, ...rest } = e; return rest; }); }}
                               className={`p-4 border-2 rounded-lg text-center transition-colors ${
-                                selectedPayment === m.id ? "border-primary bg-primary/5" : "border-gray-200 hover:border-primary/50"
+                                effectivePayment === m.id ? "border-primary bg-primary/5" : "border-gray-200 hover:border-primary/50"
                               }`}
                             >
-                              <Icon className={`w-6 h-6 mx-auto mb-1 ${selectedPayment === m.id ? "text-primary" : "text-gray-500"}`} />
+                              <Icon className={`w-6 h-6 mx-auto mb-1 ${effectivePayment === m.id ? "text-primary" : "text-gray-500"}`} />
                               <p className="text-sm font-semibold text-dark">{m.name}</p>
                             </button>
                           );
@@ -402,7 +400,7 @@ export default function CheckoutPage() {
 
                     {selectedMethod?.type === "bank_transfer" && (
                       <div className="p-4 bg-gray-custom rounded-lg space-y-1.5 text-sm">
-                        <p className="font-semibold text-dark mb-2">Transfer the total to the account below, using your order number <span className="font-mono text-primary">{orderId}</span> as the payment reference:</p>
+                        <p className="font-semibold text-dark mb-2">Transfer the total to the account below. Use the order number shown on the confirmation page as your payment reference:</p>
                         {selectedMethod.bankName && <p><span className="text-gray-500">Bank:</span> <span className="font-semibold text-dark">{selectedMethod.bankName}</span></p>}
                         {selectedMethod.accountName && <p><span className="text-gray-500">Account Name:</span> <span className="font-semibold text-dark">{selectedMethod.accountName}</span></p>}
                         {selectedMethod.accountNumber && <p><span className="text-gray-500">Account Number:</span> <span className="font-mono font-semibold text-dark">{selectedMethod.accountNumber}</span></p>}
@@ -435,8 +433,8 @@ export default function CheckoutPage() {
                       <button onClick={() => goToStep(2, 3)} className="px-6 py-3.5 border-2 border-gray-200 text-dark font-semibold rounded-lg hover:bg-gray-custom transition-all">
                         ← Back
                       </button>
-                      <button onClick={handlePlaceOrder} disabled={!selectedMethod} className="flex-1 px-6 py-3.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-all shadow-lg shadow-green-600/30 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
-                        <LockIcon className="w-4 h-4" /> Place Order — {formatPrice(total)}
+                      <button onClick={handlePlaceOrder} disabled={!selectedMethod || placing} className="flex-1 px-6 py-3.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-all shadow-lg shadow-green-600/30 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+                        <LockIcon className="w-4 h-4" /> {placing ? "Placing Order..." : `Place Order — ${formatPrice(total)}`}
                       </button>
                     </div>
 

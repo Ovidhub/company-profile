@@ -68,9 +68,11 @@ class PaymentMethodController extends Controller
             'secretKey' => ['nullable', 'string', 'max:200'],
             'codInstructions' => ['nullable', 'string', 'max:1000'],
             'customInstructions' => ['nullable', 'string', 'max:1000'],
+            'order' => ['sometimes', 'integer', 'min:0'],
         ]);
 
         $map = [
+            'order' => 'sort_order',
             'isDefault' => 'is_default', 'bankName' => 'bank_name', 'accountName' => 'account_name',
             'accountNumber' => 'account_number', 'routingNumber' => 'routing_number', 'swiftCode' => 'swift_code',
             'bankAddress' => 'bank_address', 'publicKey' => 'public_key', 'secretKey' => 'secret_key',

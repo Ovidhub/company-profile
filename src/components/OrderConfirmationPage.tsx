@@ -5,9 +5,9 @@ import { formatPrice } from "../data/products";
 
 export default function OrderConfirmationPage() {
   const [params] = useSearchParams();
-  const { orders } = useAdminData();
+  const { lastOrder, orders } = useAdminData();
   const orderId = params.get("order") || "DEE-00000000";
-  const order = orders.find((o) => o.id === orderId);
+  const order = lastOrder?.id === orderId ? lastOrder : orders.find((o) => o.id === orderId);
   const estimatedDelivery = new Date();
   estimatedDelivery.setDate(estimatedDelivery.getDate() + 5);
 

@@ -10,6 +10,7 @@ export default function ContactSection() {
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const update = (k: string, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -20,7 +21,7 @@ export default function ContactSection() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const next: Record<string, string> = {};
     if (!form.name.trim()) next.name = "Please enter your name";
@@ -28,17 +29,24 @@ export default function ContactSection() {
     if (!form.subject.trim()) next.subject = "Please enter a subject";
     if (!form.message.trim()) next.message = "Please enter your message";
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0 || sending) return;
 
-    addMessage({
-      name: form.name.trim(),
-      email: form.email.trim(),
-      subject: form.subject.trim(),
-      message: form.message.trim(),
-    });
-    setForm({ name: "", email: "", subject: "", message: "" });
-    setSent(true);
-    setTimeout(() => setSent(false), 6000);
+    setSending(true);
+    try {
+      await addMessage({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        subject: form.subject.trim(),
+        message: form.message.trim(),
+      });
+      setForm({ name: "", email: "", subject: "", message: "" });
+      setSent(true);
+      setTimeout(() => setSent(false), 6000);
+    } catch (err) {
+      setErrors({ message: err instanceof Error ? err.message : "Could not send your message. Please try again." });
+    } finally {
+      setSending(false);
+    }
   };
 
   const inputClass = (field: string) =>
@@ -116,8 +124,8 @@ export default function ContactSection() {
                 {errors.message && <p className="text-xs text-red-600 mt-1">{errors.message}</p>}
               </div>
               {/* Navy blue Send Message button */}
-              <button type="submit" className="w-full px-6 py-3.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-light transition-all shadow-lg shadow-primary/30 hover:shadow-primary/50">
-                Send Message
+              <button type="submit" disabled={sending} className="w-full px-6 py-3.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-light transition-all shadow-lg shadow-primary/30 hover:shadow-primary/50 disabled:opacity-60">
+                {sending ? "Sending..." : "Send Message"}
               </button>
             </form>
           </div>

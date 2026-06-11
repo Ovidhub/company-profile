@@ -1,8 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { PRODUCTS as INITIAL_PRODUCTS, Product, Category, DEFAULT_CATEGORIES } from "../data/products";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { ShoppingBag, type LucideIcon } from "lucide-react";
+import { Product, Category, AVAILABLE_ICONS, DEFAULT_CATEGORIES, PRODUCTS as INITIAL_PRODUCTS } from "../data/products";
 import { SERVICES as INITIAL_SERVICES, Service } from "../data/services";
 import { IMAGES as INITIAL_IMAGES, ImageRegistry } from "../data/images";
-import { PaymentMethod as PaymentMethodType, DEFAULT_PAYMENT_METHODS } from "../data/paymentMethods";
+import { PaymentMethod as PaymentMethodType } from "../data/paymentMethods";
+import { api, ApiError } from "../lib/api";
+import { useAuth } from "./AuthContext";
 
 export type PaymentMethod = PaymentMethodType;
 
@@ -45,6 +48,13 @@ export interface ContactMessage {
   message: string;
   date: string;
   read: boolean;
+}
+
+export interface PlaceOrderPayload {
+  customer: Order["customer"];
+  items: { product_id: number; quantity: number }[];
+  shipping_method: "std" | "exp" | "pck";
+  payment_method_id: number;
 }
 
 interface AdminDataContextType {
@@ -96,12 +106,13 @@ interface AdminDataContextType {
   updateTestimonial: (id: string, data: Partial<Testimonial>) => void;
 
   // Orders
-  addOrder: (order: Order) => void;
+  placeOrder: (payload: PlaceOrderPayload) => Promise<Order>;
+  lastOrder: Order | null;
   updateOrderStatus: (id: string, status: Order["status"]) => void;
   removeOrder: (id: string) => void;
 
   // Messages
-  addMessage: (data: Omit<ContactMessage, "id" | "date" | "read">) => void;
+  addMessage: (data: Omit<ContactMessage, "id" | "date" | "read">) => Promise<void>;
   markMessageRead: (id: string) => void;
   removeMessage: (id: string) => void;
 
@@ -115,93 +126,121 @@ interface AdminDataContextType {
 
 const AdminDataContext = createContext<AdminDataContextType | undefined>(undefined);
 
-const DEFAULT_HERO_SLIDES: HeroSlide[] = [
-  { id: "h1", title: "Revolutionizing Agriculture for a Sustainable Tomorrow", subtitle: "Empowering food security through smart animal farming, agri-tech innovation, and expert farm management solutions.", image: INITIAL_IMAGES.heroAgriculture, tag: "Agriculture", iconName: "Wheat" },
-  { id: "h2", title: "Master the Markets. Build Wealth.", subtitle: "We offer expert-led forex education, strategic trading support, and financial risk management for long-term success.", image: INITIAL_IMAGES.heroFinance, tag: "Financial Markets", iconName: "TrendingUp" },
-  { id: "h3", title: "Telling Stories That Inspire", subtitle: "From script to screen, we craft powerful visual narratives through expert cinematography, editing, and global media distribution.", image: INITIAL_IMAGES.heroFilm, tag: "Film Production", iconName: "Film" },
-  { id: "h4", title: "Innovative Tech. Smarter Solutions.", subtitle: "Delivering cutting-edge ICT services, device sales, app development, and digital transformation strategies for the modern world.", image: INITIAL_IMAGES.heroTech, tag: "Technology", iconName: "Cpu" },
-  { id: "h5", title: "Websites That Convert. Brands That Shine.", subtitle: "From business websites to e-commerce platforms — we design, develop, and optimize digital experiences that grow your business.", image: INITIAL_IMAGES.heroWebDesign, tag: "Web Design & Development", iconName: "Globe" },
-  { id: "h6", title: "Secure Properties. Smart Buildings.", subtitle: "CCTV, access control, smart security, and property technology solutions for modern homes and businesses.", image: INITIAL_IMAGES.heroSecurity, tag: "Security Solutions", iconName: "ShieldCheck" },
-  { id: "h7", title: "Clean Spaces. Professional Results.", subtitle: "We provide reliable, high-standard cleaning and disinfection services for homes, offices, and post-construction environments.", image: INITIAL_IMAGES.heroCleaning, tag: "Cleaning Services", iconName: "Sparkles" },
-];
+// === icon name <-> component mapping (the API stores names; the UI renders components) ===
+const ICON_BY_NAME: Record<string, LucideIcon> = Object.fromEntries(AVAILABLE_ICONS.map((i) => [i.name, i.icon]));
 
-const DEFAULT_TESTIMONIALS: Testimonial[] = [
-  { id: "t1", name: "David Mensah", role: "CEO, GreenBridge Group", text: "Partnering with De-ebrightmarn Limited has been one of the smartest business decisions we've made. Their innovative solutions and unwavering professionalism across multiple industries have made a tangible impact on our operations and community development goals.", rating: 5 },
-  { id: "t2", name: "Sarah Oduwale", role: "Creative Director, Global Voices Media", text: "Working with De-ebrightmarn on our documentary was nothing short of exceptional. From scripting to post-production, their creative team delivered a powerful story that captured hearts globally.", rating: 5 },
-  { id: "t3", name: "Ayodele Akinbiyi", role: "Commercial Farmer, Ogun State", text: "De-eFarm helped us transform our outdated farming processes into a sustainable, tech-driven operation. Their agri-tech solutions and expert consulting gave our farm a 40% boost in productivity within one season.", rating: 5 },
-  { id: "t4", name: "Chinwe Okeke", role: "Forex Trader & Alumni", text: "As a young trader, I had limited knowledge of the financial markets. De-eFxacademy's training was a game-changer—clear, hands-on, and empowering. I now trade confidently with consistent results.", rating: 5 },
-  { id: "t5", name: "Ibrahim Lawal", role: "COO, SwiftAccess Logistics", text: "The De-eTech team developed and deployed a custom ICT solution that automated 70% of our business processes. Their support and attention to detail have made them our go-to tech partner.", rating: 5 },
-];
-
-const DEFAULT_ORDERS: Order[] = [
-  { id: "DEE-84736291", customer: { name: "David Mensah", email: "david@greenbridge.com", phone: "+234 803 456 7890", address: "24 Adetokunbo Ademola", city: "Abuja", state: "FCT", zip: "900001", country: "Nigeria" }, items: [{ productId: "p1", name: "iPhone 15 Pro Max", price: 1199, quantity: 1, image: INITIAL_IMAGES.serviceTech }, { productId: "p5", name: "AirPods Pro (2nd Gen)", price: 249, quantity: 2, image: INITIAL_IMAGES.serviceTech }], subtotal: 1697, shipping: 0, tax: 135.76, total: 1832.76, status: "delivered", paymentMethod: "Card ending 3456", date: "2025-01-15" },
-  { id: "DEE-29401736", customer: { name: "Sarah Oduwale", email: "sarah@gvm.com", phone: "+234 802 123 4567", address: "10 Bishop Aboyade Cole", city: "Lagos", state: "Lagos", zip: "101233", country: "Nigeria" }, items: [{ productId: "p3", name: "MacBook Pro 16\" M3 Max", price: 3499, quantity: 1, image: INITIAL_IMAGES.serviceTech }], subtotal: 3499, shipping: 0, tax: 279.92, total: 3778.92, status: "shipped", paymentMethod: "Card ending 7821", date: "2025-01-20" },
-  { id: "DEE-91827364", customer: { name: "Ibrahim Lawal", email: "ibrahim@swiftaccess.com", phone: "+234 805 999 1234", address: "5 Independence Ave", city: "Port Harcourt", state: "Rivers", zip: "500272", country: "Nigeria" }, items: [{ productId: "p11", name: "Google Nest Hub Max", price: 229, quantity: 1, image: INITIAL_IMAGES.serviceTech }, { productId: "p9", name: "Logitech MX Master 3S", price: 99, quantity: 1, image: INITIAL_IMAGES.serviceTech }], subtotal: 328, shipping: 25, tax: 26.24, total: 379.24, status: "processing", paymentMethod: "Bank Transfer", date: "2025-01-22" },
-];
-
-const DEFAULT_MESSAGES: ContactMessage[] = [
-  { id: "m1", name: "John Akinwale", email: "john@company.com", phone: "+234 803 111 2222", subject: "Partnership Opportunity", message: "Hi, I would like to discuss a potential partnership for our fintech startup. Could we schedule a call this week?", date: "2025-01-23T10:30:00", read: false },
-  { id: "m2", name: "Mary Ogun", email: "mary.o@gmail.com", subject: "Service Inquiry", message: "Hello, I'm interested in your film production services for a corporate documentary. Please share your rates and availability.", date: "2025-01-22T14:15:00", read: true },
-  { id: "m3", name: "Ahmed Bello", email: "ahmed@realestate.ng", phone: "+234 802 333 4444", subject: "Security Installation", message: "We need CCTV and access control installation for our new estate in Lekki. Can you send a quote?", date: "2025-01-21T09:00:00", read: false },
-];
-
-function loadState<T>(key: string, fallback: T, isValid?: (v: unknown) => boolean): T {
-  try {
-    const saved = localStorage.getItem(key);
-    if (!saved) return fallback;
-    const parsed = JSON.parse(saved);
-    // Tampered/corrupted storage must not crash the app — fall back to defaults.
-    const check = isValid ?? (Array.isArray(fallback) ? Array.isArray : () => true);
-    return check(parsed) ? (parsed as T) : fallback;
-  } catch {
-    return fallback;
-  }
+function iconToName(icon: unknown): string {
+  if (typeof icon === "string") return ICON_BY_NAME[icon] ? icon : "ShoppingBag";
+  const found = AVAILABLE_ICONS.find((i) => i.icon === icon);
+  return found?.name ?? "ShoppingBag";
 }
 
-function saveState<T>(key: string, value: T) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (err) {
-    // Quota can be exceeded when large base64 images are saved — keep the app running.
-    console.warn(`Failed to persist "${key}" to localStorage`, err);
-  }
+interface ApiCategory {
+  id: string;
+  label: string;
+  icon: string;
+  description?: string | null;
+  order: number;
+  active: boolean;
 }
 
-const isPlainObject = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
+function toClientCategory(c: ApiCategory): Category {
+  return {
+    id: c.id,
+    label: c.label,
+    icon: ICON_BY_NAME[c.icon] ?? ShoppingBag,
+    description: c.description ?? undefined,
+    order: c.order,
+    active: c.active,
+  };
+}
+
+interface ContentBundle {
+  heroSlides: HeroSlide[];
+  testimonials: Testimonial[];
+  images: Record<string, string>;
+  categories: ApiCategory[];
+  products: Product[];
+  paymentMethods: PaymentMethod[];
+}
+
+function reportError(err: unknown, fallback: string) {
+  const message = err instanceof ApiError ? err.message : fallback;
+  alert(message);
+}
 
 export function AdminDataProvider({ children }: { children: ReactNode }) {
-  const [products, setProducts] = useState<Product[]>(() => loadState("admin_products", INITIAL_PRODUCTS));
-  const [categories, setCategories] = useState<Category[]>(() => loadState("admin_categories", DEFAULT_CATEGORIES));
-  const [servicios] = useState<Service[]>(INITIAL_SERVICES);
-  const [images, setImages] = useState<ImageRegistry>(() => loadState("admin_images", INITIAL_IMAGES, isPlainObject));
-  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(() => loadState("admin_hero_slides", DEFAULT_HERO_SLIDES));
-  const [testimonials, setTestimonials] = useState<Testimonial[]>(() => loadState("admin_testimonials", DEFAULT_TESTIMONIALS));
-  const [orders, setOrders] = useState<Order[]>(() => loadState("admin_orders", DEFAULT_ORDERS));
-  const [messages, setMessages] = useState<ContactMessage[]>(() => loadState("admin_messages", DEFAULT_MESSAGES));
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(() => loadState("admin_payment_methods", DEFAULT_PAYMENT_METHODS));
+  const { isAuthenticated } = useAuth();
 
-  useEffect(() => saveState("admin_products", products), [products]);
-  useEffect(() => saveState("admin_categories", categories), [categories]);
-  useEffect(() => saveState("admin_images", images), [images]);
-  useEffect(() => saveState("admin_hero_slides", heroSlides), [heroSlides]);
-  useEffect(() => saveState("admin_testimonials", testimonials), [testimonials]);
-  useEffect(() => saveState("admin_orders", orders), [orders]);
-  useEffect(() => saveState("admin_messages", messages), [messages]);
-  useEffect(() => saveState("admin_payment_methods", paymentMethods), [paymentMethods]);
+  // Static defaults render instantly; the API response replaces them.
+  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [servicios] = useState<Service[]>(INITIAL_SERVICES);
+  const [images, setImages] = useState<ImageRegistry>(INITIAL_IMAGES);
+  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([]);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [publicPaymentMethods, setPublicPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [lastOrder, setLastOrder] = useState<Order | null>(null);
+
+  const loadContent = useCallback(async () => {
+    try {
+      const content = await api.get<ContentBundle>("/content");
+      setHeroSlides(content.heroSlides);
+      setTestimonials(content.testimonials);
+      setImages((prev) => ({ ...prev, ...content.images }) as ImageRegistry);
+      setCategories(content.categories.map(toClientCategory));
+      setProducts(content.products);
+      setPublicPaymentMethods(content.paymentMethods);
+    } catch (err) {
+      console.warn("Could not load content from the API; using built-in defaults.", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadContent();
+  }, [loadContent]);
+
+  // Admin-only data needs a valid token.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    api.get<{ order: never; data: Order[] } | Order[]>("/admin/orders")
+      .then((res) => setOrders(Array.isArray(res) ? res : (res as { data: Order[] }).data))
+      .catch(() => {});
+    api.get<{ data: ContactMessage[] }>("/admin/messages")
+      .then((res) => setMessages(Array.isArray(res) ? (res as unknown as ContactMessage[]) : res.data))
+      .catch(() => {});
+    api.get<{ data: PaymentMethod[] }>("/admin/payment-methods")
+      .then((res) => setPaymentMethods(Array.isArray(res) ? (res as unknown as PaymentMethod[]) : res.data))
+      .catch(() => {
+        /* editors are not allowed to see payment methods — leave empty */
+      });
+  }, [isAuthenticated]);
 
   // === CATEGORIES ===
   const addCategory = (data: Omit<Category, "id" | "order">) => {
-    setCategories((prev) => {
-      const maxOrder = prev.reduce((max, c) => Math.max(max, c.order), 0);
-      const dataAny = data as Partial<Category>;
-      const id = dataAny.id || (data.label || "category").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-      const uniqueId = prev.find((c) => c.id === id) ? `${id}-${Date.now()}` : id;
-      return [...prev, { ...data, id: uniqueId, order: maxOrder + 1 } as Category];
-    });
+    api.post<{ data: ApiCategory }>("/admin/categories", {
+      label: data.label,
+      icon: iconToName(data.icon),
+      description: data.description,
+      active: data.active,
+    })
+      .then((res) => setCategories((prev) => [...prev, toClientCategory(res.data)]))
+      .catch((err) => reportError(err, "Could not create the category."));
   };
 
   const updateCategory = (id: string, data: Partial<Category>) => {
-    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
+    const payload: Record<string, unknown> = {};
+    if (data.label !== undefined) payload.label = data.label;
+    if (data.icon !== undefined) payload.icon = iconToName(data.icon);
+    if (data.description !== undefined) payload.description = data.description;
+    if (data.active !== undefined) payload.active = data.active;
+
+    api.put<{ data: ApiCategory }>(`/admin/categories/${id}`, payload)
+      .then((res) => setCategories((prev) => prev.map((c) => (c.id === id ? toClientCategory(res.data) : c))))
+      .catch((err) => reportError(err, "Could not update the category."));
   };
 
   const removeCategory = (id: string) => {
@@ -210,130 +249,182 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       return;
     }
     const productCount = products.filter((p) => p.category === id).length;
-    if (productCount > 0) {
-      if (!confirm(`This category has ${productCount} product(s). Products will be moved to 'Other'. Continue?`)) return;
+    if (productCount > 0 && !confirm(`This category has ${productCount} product(s). Products will be moved to 'Other'. Continue?`)) {
+      return;
     }
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-    // Move products in this category to "other" or first available
-    setProducts((prev) => prev.map((p) => (p.category === id ? { ...p, category: "other", categoryLabel: "Other" } : p)));
+    api.delete(`/admin/categories/${id}`)
+      .then(() => {
+        setCategories((prev) => prev.filter((c) => c.id !== id));
+        setProducts((prev) => prev.map((p) => (p.category === id ? { ...p, category: "other", categoryLabel: "Other" } : p)));
+      })
+      .catch((err) => reportError(err, "Could not delete the category."));
   };
 
   const reorderCategories = (ids: string[]) => {
-    setCategories((prev) => {
-      const map = new Map(prev.map((c) => [c.id, c]));
-      return ids.map((id, idx) => {
-        const cat = map.get(id);
-        return cat ? { ...cat, order: idx } : null;
-      }).filter(Boolean) as Category[];
-    });
+    api.post<{ data: ApiCategory[] }>("/admin/categories/reorder", { ids })
+      .then((res) => setCategories(res.data.map(toClientCategory)))
+      .catch((err) => reportError(err, "Could not reorder categories."));
   };
 
   // === PAYMENT METHODS ===
+  const paymentMethodPayload = (data: Partial<PaymentMethod>) => {
+    const payload: Record<string, unknown> = { ...data };
+    delete payload.id;
+    // Empty secret means "leave the stored secret untouched".
+    if (!payload.secretKey) delete payload.secretKey;
+    return payload;
+  };
+
+  const applyDefaultExclusivity = (updated: PaymentMethod) => (prev: PaymentMethod[]) =>
+    prev.map((m) => (m.id === updated.id ? updated : updated.isDefault ? { ...m, isDefault: false } : m));
+
   const addPaymentMethod = (data: Omit<PaymentMethod, "id" | "order">) => {
-    setPaymentMethods((prev) => {
-      const maxOrder = prev.reduce((max, m) => Math.max(max, m.order), 0);
-      const id = `pm_${data.type}_${Date.now()}`;
-      let next = [...prev, { ...data, id, order: maxOrder + 1 } as PaymentMethod];
-      // If this is set as default, un-default others
-      if (data.isDefault) {
-        next = next.map((m) => (m.id === id ? m : { ...m, isDefault: false }));
-      }
-      return next;
-    });
+    api.post<{ data: PaymentMethod }>("/admin/payment-methods", paymentMethodPayload(data))
+      .then((res) => setPaymentMethods((prev) => [...applyDefaultExclusivity(res.data)(prev), res.data].filter((m, i, all) => all.findIndex((x) => x.id === m.id) === i)))
+      .catch((err) => reportError(err, "Could not create the payment method."));
   };
 
   const updatePaymentMethod = (id: string, data: Partial<PaymentMethod>) => {
-    setPaymentMethods((prev) => {
-      let next = prev.map((m) => (m.id === id ? { ...m, ...data } : m));
-      // If this is being set as default, un-default others
-      if (data.isDefault) {
-        next = next.map((m) => (m.id === id ? m : { ...m, isDefault: false }));
-      }
-      return next;
-    });
+    api.put<{ data: PaymentMethod }>(`/admin/payment-methods/${id}`, paymentMethodPayload(data))
+      .then((res) => setPaymentMethods(applyDefaultExclusivity(res.data)))
+      .catch((err) => reportError(err, "Could not update the payment method."));
   };
 
   const removePaymentMethod = (id: string) => {
-    setPaymentMethods((prev) => prev.filter((m) => m.id !== id));
+    api.delete(`/admin/payment-methods/${id}`)
+      .then(() => setPaymentMethods((prev) => prev.filter((m) => m.id !== id)))
+      .catch((err) => reportError(err, "Could not delete the payment method."));
   };
 
   const setDefaultPaymentMethod = (id: string) => {
-    setPaymentMethods((prev) => prev.map((m) => ({ ...m, isDefault: m.id === id })));
+    updatePaymentMethod(id, { isDefault: true });
   };
 
   // === HERO SLIDES ===
-  const updateHeroSlide = (id: string, data: Partial<HeroSlide>) => {
-    setHeroSlides((prev) => prev.map((s) => (s.id === id ? { ...s, ...data } : s)));
+  const slidePayload = (data: Partial<HeroSlide>) => {
+    const payload: Record<string, unknown> = { ...data };
+    delete payload.id;
+    return payload;
   };
+
   const addHeroSlide = (data: Omit<HeroSlide, "id">) => {
-    setHeroSlides((prev) => [...prev, { ...data, id: `h${Date.now()}` }]);
+    api.post<{ data: HeroSlide }>("/admin/hero-slides", slidePayload(data))
+      .then((res) => setHeroSlides((prev) => [...prev, res.data]))
+      .catch((err) => reportError(err, "Could not create the slide."));
   };
+
+  const updateHeroSlide = (id: string, data: Partial<HeroSlide>) => {
+    api.put<{ data: HeroSlide }>(`/admin/hero-slides/${id}`, slidePayload(data))
+      .then((res) => setHeroSlides((prev) => prev.map((s) => (s.id === id ? res.data : s))))
+      .catch((err) => reportError(err, "Could not update the slide."));
+  };
+
   const removeHeroSlide = (id: string) => {
-    setHeroSlides((prev) => prev.filter((s) => s.id !== id));
+    api.delete(`/admin/hero-slides/${id}`)
+      .then(() => setHeroSlides((prev) => prev.filter((s) => s.id !== id)))
+      .catch((err) => reportError(err, "Could not delete the slide."));
   };
 
   // === PRODUCTS ===
-  const updateProduct = (id: string, data: Partial<Product>) => {
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...data } : p)));
-  };
-  const addProduct = (data: Omit<Product, "id">) => {
-    setProducts((prev) => [...prev, { ...data, id: `p${Date.now()}` }]);
-  };
-  const removeProduct = (id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+  const productPayload = (data: Partial<Product>) => {
+    const payload: Record<string, unknown> = { ...data };
+    delete payload.id;
+    delete payload.categoryLabel; // derived server-side from the category
+    delete payload.images;
+    return payload;
   };
 
-  // === SERVICES ===
+  const addProduct = (data: Omit<Product, "id">) => {
+    api.post<{ data: Product }>("/admin/products", productPayload(data))
+      .then((res) => setProducts((prev) => [...prev, res.data]))
+      .catch((err) => reportError(err, "Could not create the product."));
+  };
+
+  const updateProduct = (id: string, data: Partial<Product>) => {
+    api.put<{ data: Product }>(`/admin/products/${id}`, productPayload(data))
+      .then((res) => setProducts((prev) => prev.map((p) => (p.id === id ? res.data : p))))
+      .catch((err) => reportError(err, "Could not update the product."));
+  };
+
+  const removeProduct = (id: string) => {
+    api.delete(`/admin/products/${id}`)
+      .then(() => setProducts((prev) => prev.filter((p) => p.id !== id)))
+      .catch((err) => reportError(err, "Could not delete the product."));
+  };
+
+  // === SERVICES (static content in this version) ===
   const updateService = (_id: string, _data: Partial<Service>) => {
     console.warn("Service updates are limited to images in this demo");
   };
   const updateServiceImage = (id: string, image: string) => {
-    setImages((prev: ImageRegistry) => ({ ...prev, [`service${id.charAt(0).toUpperCase() + id.slice(1)}`]: image } as ImageRegistry));
+    const key = `service${id.charAt(0).toUpperCase() + id.slice(1)}` as keyof ImageRegistry;
+    updateImage(key, image);
   };
 
   // === IMAGES ===
   const updateImage = (key: keyof ImageRegistry, url: string) => {
-    setImages((prev) => ({ ...prev, [key]: url }));
+    api.put(`/admin/site-images/${String(key)}`, { url })
+      .then(() => setImages((prev) => ({ ...prev, [key]: url }) as ImageRegistry))
+      .catch((err) => reportError(err, "Could not save the image."));
   };
 
   // === TESTIMONIALS ===
   const addTestimonial = (data: Omit<Testimonial, "id">) => {
-    setTestimonials((prev) => [...prev, { ...data, id: `t${Date.now()}` }]);
+    api.post<{ data: Testimonial }>("/admin/testimonials", data)
+      .then((res) => setTestimonials((prev) => [...prev, res.data]))
+      .catch((err) => reportError(err, "Could not create the testimonial."));
   };
-  const removeTestimonial = (id: string) => {
-    setTestimonials((prev) => prev.filter((t) => t.id !== id));
-  };
+
   const updateTestimonial = (id: string, data: Partial<Testimonial>) => {
-    setTestimonials((prev) => prev.map((t) => (t.id === id ? { ...t, ...data } : t)));
+    const payload: Record<string, unknown> = { ...data };
+    delete payload.id;
+    api.put<{ data: Testimonial }>(`/admin/testimonials/${id}`, payload)
+      .then((res) => setTestimonials((prev) => prev.map((t) => (t.id === id ? res.data : t))))
+      .catch((err) => reportError(err, "Could not update the testimonial."));
+  };
+
+  const removeTestimonial = (id: string) => {
+    api.delete(`/admin/testimonials/${id}`)
+      .then(() => setTestimonials((prev) => prev.filter((t) => t.id !== id)))
+      .catch((err) => reportError(err, "Could not delete the testimonial."));
   };
 
   // === ORDERS ===
-  const addOrder = (order: Order) => {
-    setOrders((prev) => [order, ...prev]);
+  const placeOrder = async (payload: PlaceOrderPayload): Promise<Order> => {
+    const res = await api.post<{ order: Order }>("/orders", payload);
+    setLastOrder(res.order);
+    setOrders((prev) => [res.order, ...prev]);
+    return res.order;
   };
+
   const updateOrderStatus = (id: string, status: Order["status"]) => {
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+    api.patch<{ order: Order }>(`/admin/orders/${id}`, { status })
+      .then((res) => setOrders((prev) => prev.map((o) => (o.id === id ? res.order : o))))
+      .catch((err) => reportError(err, "Could not update the order status."));
   };
+
   const removeOrder = (id: string) => {
-    setOrders((prev) => prev.filter((o) => o.id !== id));
+    api.delete(`/admin/orders/${id}`)
+      .then(() => setOrders((prev) => prev.filter((o) => o.id !== id)))
+      .catch((err) => reportError(err, "Could not delete the order."));
   };
 
   // === MESSAGES ===
-  const addMessage = (data: Omit<ContactMessage, "id" | "date" | "read">) => {
-    setMessages((prev) => [{ ...data, id: `m${Date.now()}`, date: new Date().toISOString(), read: false }, ...prev]);
-  };
-  const markMessageRead = (id: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, read: true } : m)));
-  };
-  const removeMessage = (id: string) => {
-    setMessages((prev) => prev.filter((m) => m.id !== id));
+  const addMessage = async (data: Omit<ContactMessage, "id" | "date" | "read">): Promise<void> => {
+    await api.post("/messages", data);
   };
 
-  // Gateway secret keys must never reach customer-facing pages.
-  const publicPaymentMethods = paymentMethods.map((m) => {
-    const { secretKey: _secretKey, metadata: _metadata, ...safe } = m;
-    return safe as PaymentMethod;
-  });
+  const markMessageRead = (id: string) => {
+    api.patch<{ data: ContactMessage }>(`/admin/messages/${id}`, { read: true })
+      .then((res) => setMessages((prev) => prev.map((m) => (m.id === id ? res.data : m))))
+      .catch((err) => reportError(err, "Could not update the message."));
+  };
+
+  const removeMessage = (id: string) => {
+    api.delete(`/admin/messages/${id}`)
+      .then(() => setMessages((prev) => prev.filter((m) => m.id !== id)))
+      .catch((err) => reportError(err, "Could not delete the message."));
+  };
 
   // === STATS ===
   const totalRevenue = orders.filter((o) => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
@@ -351,7 +442,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         updateProduct, addProduct, removeProduct,
         updateService, updateServiceImage, updateImage,
         addTestimonial, removeTestimonial, updateTestimonial,
-        addOrder, updateOrderStatus, removeOrder,
+        placeOrder, lastOrder, updateOrderStatus, removeOrder,
         addMessage, markMessageRead, removeMessage,
         paymentMethods, publicPaymentMethods, addPaymentMethod, updatePaymentMethod, removePaymentMethod, setDefaultPaymentMethod,
         totalRevenue, totalOrders, pendingOrders, totalProducts, unreadMessages,

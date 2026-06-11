@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Upload, X, Loader2 } from "lucide-react";
+import { api } from "../lib/api";
 
 interface ImageUploaderProps {
   value: string;
@@ -18,7 +19,7 @@ export function ImageUploader({ value, onChange, label, className = "", aspectRa
   // and re-rendered across the site.
   const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     if (!ALLOWED_TYPES.includes(file.type)) {
       alert("Please upload a PNG, JPG, WebP, or GIF image");
       return;
@@ -28,17 +29,17 @@ export function ImageUploader({ value, onChange, label, className = "", aspectRa
       return;
     }
     setUploading(true);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      onChange(dataUrl);
+    try {
+      // The server re-validates the actual file content, not just the type.
+      const formData = new FormData();
+      formData.append("image", file);
+      const { url } = await api.upload<{ url: string }>("/admin/uploads", formData);
+      onChange(url);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Upload failed. Please try again.");
+    } finally {
       setUploading(false);
-    };
-    reader.onerror = () => {
-      alert("Failed to read file");
-      setUploading(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {

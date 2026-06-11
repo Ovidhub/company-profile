@@ -16,4 +16,11 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  server: {
+    proxy: {
+      // Laravel API + uploaded files (php artisan serve)
+      "/api": "http://localhost:8000",
+      "/storage": "http://localhost:8000",
+    },
+  },
 });
