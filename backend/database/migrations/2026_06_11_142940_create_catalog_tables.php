@@ -27,7 +27,8 @@ return new class extends Migration
             $table->decimal('original_price', 10, 2)->nullable();
             $table->text('image');
             $table->text('description');
-            $table->json('features')->default('[]');
+            // No default: MySQL 8 cannot apply defaults to JSON columns.
+            $table->json('features')->nullable();
             $table->boolean('in_stock')->default(true);
             $table->decimal('rating', 2, 1)->default(0);
             $table->integer('reviews')->default(0);
