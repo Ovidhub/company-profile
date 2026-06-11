@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+/* De-ebrightmarn Brand Colors - Extracted from logo */
+@theme {
+  --color-primary: #1b2058;
+  --color-primary-light: #2a3078;
+  --color-primary-dark: #111540;
+  --color-accent: #c8a96e;
+  --color-accent-light: #d4b97f;
+  --color-accent-dark: #a8884a;
+  --color-dark: #1a1a2e;
+  --color-dark-2: #0d1030;
+  --color-gray-custom: #f8f9fa;
+  --color-gray-light: #fafafa;
+  --font-heading: 'Jost', sans-serif;
+  --font-body: 'Jost', sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+}
+
+/* === BRAND BUTTON CLASSES === */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-7 py-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary-light transition-all shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5;
+  }
+
+  .btn-accent {
+    @apply inline-flex items-center gap-2 px-7 py-3 bg-accent text-white font-semibold rounded-lg hover:bg-accent-light transition-all shadow-lg shadow-accent/25 hover:shadow-accent/40 hover:-translate-y-0.5;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center gap-2 px-7 py-3 bg-white text-primary font-semibold rounded-lg border-2 border-primary hover:bg-primary hover:text-white transition-all hover:-translate-y-0.5;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-7 py-3 bg-white/10 backdrop-blur-sm text-white font-semibold rounded-lg border border-white/20 hover:bg-white/20 transition-all hover:-translate-y-0.5;
+  }
+
+  .btn-white {
+    @apply inline-flex items-center gap-2 px-7 py-3 bg-white text-primary font-semibold rounded-lg hover:bg-gray-100 transition-all shadow-lg hover:-translate-y-0.5;
+  }
+
+  /* Section tag (small uppercase pill) */
+  .tag-pill {
+    @apply inline-block px-4 py-1.5 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider rounded-full;
+  }
+
+  .tag-pill-accent {
+    @apply inline-block px-4 py-1.5 bg-accent/10 text-accent-dark text-xs font-semibold uppercase tracking-wider rounded-full;
+  }
+}
+
+/* Swiper overrides */
+.swiper-pagination-bullet {
+  background-color: rgba(255,255,255,0.5) !important;
+  width: 12px !important;
+  height: 12px !important;
+  transition: all 0.3s !important;
+  opacity: 1 !important;
+}
+
+.swiper-pagination-bullet-active {
+  background-color: var(--color-accent) !important;
+  width: 32px !important;
+  border-radius: 6px !important;
+}
+
+.swiper-button-prev,
+.swiper-button-next {
+  color: white !important;
+  background: rgba(27, 32, 88, 0.7);
+  width: 50px !important;
+  height: 50px !important;
+  border-radius: 50%;
+  backdrop-filter: blur(4px);
+}
+
+.swiper-button-prev::after,
+.swiper-button-next::after {
+  font-size: 18px !important;
+  font-weight: bold !important;
+}
+
+.swiper-button-prev:hover,
+.swiper-button-next:hover {
+  background: var(--color-primary);
+}
+
+/* Hero slide animations */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.swiper-slide-active .hero-tag {
+  animation: slideUp 0.6s ease-out 0.2s both;
+}
+.swiper-slide-active .hero-title {
+  animation: slideUp 0.7s ease-out 0.4s both;
+}
+.swiper-slide-active .hero-subtitle {
+  animation: slideUp 0.7s ease-out 0.6s both;
+}
+.swiper-slide-active .hero-cta {
+  animation: slideUp 0.7s ease-out 0.8s both;
+}
+.swiper-slide-active .hero-image-wrapper {
+  animation: fadeIn 1s ease-out 0.3s both;
+}
