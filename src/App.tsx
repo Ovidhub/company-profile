@@ -26,10 +26,27 @@ import AdminImages from "./components/admin/AdminImages";
 import ProtectedRoute from "./components/admin/ProtectedRoute";
 
 function ScrollToTop() {
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-  }, [pathname]);
+    if (hash) {
+      // Section content can render after async data loads — retry briefly.
+      const id = hash.slice(1);
+      let attempts = 0;
+      const tryScroll = () => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+          // Images above may still be loading and shift the layout — correct once more.
+          setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 900);
+        } else if (attempts++ < 20) {
+          setTimeout(tryScroll, 100);
+        }
+      };
+      tryScroll();
+    } else {
+      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+    }
+  }, [pathname, hash]);
   return null;
 }
 

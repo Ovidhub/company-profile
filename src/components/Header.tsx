@@ -64,15 +64,12 @@ export default function Header({ mobileMenuOpen, setMobileMenuOpen }: { mobileMe
                   ? "text-primary/80 hover:text-primary"
                   : "text-white hover:text-accent"
               }`;
-              return link.isRoute ? (
+              // Hash links go through the router too, so they work from any page.
+              return (
                 <Link key={link.label} to={link.href} className={linkClass}>
                   {link.icon && <link.icon className="w-4 h-4" />}
                   {link.label}
                 </Link>
-              ) : (
-                <a key={link.label} href={link.href} className={linkClass}>
-                  {link.label}
-                </a>
               );
             })}
 
@@ -91,12 +88,12 @@ export default function Header({ mobileMenuOpen, setMobileMenuOpen }: { mobileMe
               )}
             </Link>
 
-            <a
-              href="/#contact"
+            <Link
+              to="/#contact"
               className="ml-2 px-6 py-2.5 bg-accent text-white text-sm font-semibold rounded-lg hover:bg-accent-light transition-all shadow-lg shadow-accent/30 hover:shadow-accent/50"
             >
               Get in Touch
-            </a>
+            </Link>
           </nav>
 
           {/* Right side: mobile action icons + menu toggle (all grouped on the right) */}
@@ -142,7 +139,7 @@ export default function Header({ mobileMenuOpen, setMobileMenuOpen }: { mobileMe
           <nav className="max-w-7xl mx-auto px-4 py-4 space-y-1">
             {navLinks.map((link) => {
               const isActive = link.isRoute ? location.pathname === link.href : false;
-              return link.isRoute ? (
+              return (
                 <Link
                   key={link.label}
                   to={link.href}
@@ -154,15 +151,6 @@ export default function Header({ mobileMenuOpen, setMobileMenuOpen }: { mobileMe
                   {link.icon && <link.icon className="w-4 h-4" />}
                   {link.label}
                 </Link>
-              ) : (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block py-3 px-3 text-primary/80 hover:text-primary hover:bg-primary/5 font-semibold rounded-lg transition-colors"
-                >
-                  {link.label}
-                </a>
               );
             })}
             <Link

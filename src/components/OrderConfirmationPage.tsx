@@ -146,9 +146,9 @@ export default function OrderConfirmationPage() {
             <h3 className="font-bold text-dark mb-2">Need Help?</h3>
             <p className="text-sm text-gray-600 mb-4">Our support team is available 24/7 to assist you</p>
             <div className="flex flex-wrap justify-center gap-3">
-              <a href="/#contact" className="text-sm text-primary hover:text-primary-light font-semibold">📧 support@de-ebrightmarn.com</a>
+              <Link to="/#contact" className="text-sm text-primary hover:text-primary-light font-semibold">📧 support@de-ebrightmarn.com</Link>
               <span className="text-gray-300">|</span>
-              <a href="/#contact" className="text-sm text-primary hover:text-primary-light font-semibold">📞 +234 (0) 123 456 7890</a>
+              <Link to="/#contact" className="text-sm text-primary hover:text-primary-light font-semibold">📞 +234 (0) 123 456 7890</Link>
             </div>
           </div>
         </div>
