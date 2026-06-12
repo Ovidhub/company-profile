@@ -4,9 +4,9 @@
 export type ImageRegistry = typeof IMAGES;
 
 export const IMAGES = {
-  // === BRAND / LOGO ===
-  logoFull: "https://de-ebrightmarn.com/wp-content/uploads/2021/11/Group-427319248.png",
-  logoIcon: "https://de-ebrightmarn.com/wp-content/uploads/2021/11/LOGO-ICON-1@2x-scaled.png",
+  // === BRAND / LOGO === (local assets; the old wp-content URLs are gone)
+  logoFull: "/images/logo-full.svg",
+  logoIcon: "/images/logo-icon.svg",
 
   // === HERO SLIDER - African themed ===
   heroAgriculture: "https://images.pexels.com/photos/10697911/pexels-photo-10697911.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=900&w=1600",

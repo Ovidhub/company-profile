@@ -129,8 +129,8 @@ class DatabaseSeeder extends Seeder
     private function seedSiteImages(): void
     {
         $rows = [
-            'logoFull' => 'https://de-ebrightmarn.com/wp-content/uploads/2021/11/Group-427319248.png',
-            'logoIcon' => 'https://de-ebrightmarn.com/wp-content/uploads/2021/11/LOGO-ICON-1@2x-scaled.png',
+            'logoFull' => '/images/logo-full.svg',
+            'logoIcon' => '/images/logo-icon.svg',
             'heroAgriculture' => 'https://images.pexels.com/photos/10697911/pexels-photo-10697911.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=900&w=1600',
             'heroFinance' => 'https://images.pexels.com/photos/5831351/pexels-photo-5831351.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=900&w=1600',
             'heroFilm' => 'https://images.pexels.com/photos/32292610/pexels-photo-32292610.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=900&w=1600',
