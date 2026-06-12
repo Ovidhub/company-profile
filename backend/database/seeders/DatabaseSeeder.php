@@ -129,8 +129,8 @@ class DatabaseSeeder extends Seeder
     private function seedSiteImages(): void
     {
         $rows = [
-            'logoFull' => '/images/logo-full.svg',
-            'logoIcon' => '/images/logo-icon.svg',
+            'logoFull' => '/images/logo-full.png',
+            'logoIcon' => '/images/logo-icon.png',
             'heroAgriculture' => 'https://images.pexels.com/photos/10697911/pexels-photo-10697911.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=900&w=1600',
             'heroFinance' => 'https://images.pexels.com/photos/5831351/pexels-photo-5831351.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=900&w=1600',
             'heroFilm' => 'https://images.pexels.com/photos/32292610/pexels-photo-32292610.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=900&w=1600',

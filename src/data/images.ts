@@ -4,9 +4,9 @@
 export type ImageRegistry = typeof IMAGES;
 
 export const IMAGES = {
-  // === BRAND / LOGO === (local assets; the old wp-content URLs are gone)
-  logoFull: "/images/logo-full.svg",
-  logoIcon: "/images/logo-icon.svg",
+  // === BRAND / LOGO === (original brand assets, served locally)
+  logoFull: "/images/logo-full.png",
+  logoIcon: "/images/logo-icon.png",
 
   // === HERO SLIDER - African themed ===
   heroAgriculture: "https://images.pexels.com/photos/10697911/pexels-photo-10697911.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=900&w=1600",
