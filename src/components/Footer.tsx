@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MapPin, Phone, Mail, ArrowUp, ShoppingBag, Shield } from "lucide-react";
+import { MapPin, Phone, Mail, ArrowUp, ShoppingBag } from "lucide-react";
 import { IMAGES } from "../data/images";
 import { SERVICES } from "../data/services";
 
@@ -108,14 +108,6 @@ export default function Footer() {
             <a href="#" className="hover:text-accent transition-colors">Privacy Policy</a>
             <span className="text-gray-600">|</span>
             <a href="#" className="hover:text-accent transition-colors">Terms of Service</a>
-            <span className="text-gray-600">|</span>
-            <Link
-              to="/admin/login"
-              className="inline-flex items-center gap-1.5 text-gray-400 hover:text-accent transition-colors"
-              title="Admin Login"
-            >
-              <Shield className="w-3.5 h-3.5" /> Admin
-            </Link>
           </div>
         </div>
       </div>
