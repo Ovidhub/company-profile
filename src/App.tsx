@@ -29,20 +29,36 @@ function ScrollToTop() {
   const { pathname, hash } = useLocation();
   useEffect(() => {
     if (hash) {
-      // Section content can render after async data loads — retry briefly.
+      // The target section renders right after navigation, but images loading
+      // above it keep shifting the layout (and cancel smooth scrolling), so we
+      // pin the section to the top with instant scrolls until things settle —
+      // backing off the moment the user scrolls themselves.
       const id = hash.slice(1);
-      let attempts = 0;
-      const tryScroll = () => {
+      const start = Date.now();
+      let cancelled = false;
+      const cancel = () => { cancelled = true; };
+      window.addEventListener("wheel", cancel, { once: true, passive: true });
+      window.addEventListener("touchmove", cancel, { once: true, passive: true });
+
+      const settle = () => {
+        if (cancelled) return;
         const el = document.getElementById(id);
         if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "start" });
-          // Images above may still be loading and shift the layout — correct once more.
-          setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 900);
-        } else if (attempts++ < 20) {
-          setTimeout(tryScroll, 100);
+          const offset = el.getBoundingClientRect().top;
+          if (Math.abs(offset) > 8) {
+            window.scrollTo({ top: window.scrollY + offset, behavior: "instant" as ScrollBehavior });
+          }
+          if (Date.now() - start < 3000) setTimeout(settle, 250);
+        } else if (Date.now() - start < 2000) {
+          setTimeout(settle, 100);
         }
       };
-      tryScroll();
+      settle();
+      return () => {
+        cancelled = true;
+        window.removeEventListener("wheel", cancel);
+        window.removeEventListener("touchmove", cancel);
+      };
     } else {
       window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
     }
